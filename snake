@@ -232,10 +232,6 @@ gameover() {
 }
 
 initGame
-# function test () {
-#	echo "$DIRECTION";
-# 	(sleep 0.1 && kill -ALRM $$) &
-# }
 
  trap move ALRM
  sleep 1
