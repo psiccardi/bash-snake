@@ -1,0 +1,278 @@
+#!/bin/bash
+
+#BOARD WIDTH
+WIDTH=50
+HEIGHT=20
+
+#DIRECTIONS
+DIRECTIONS=( "w" "s" "a" "d" )
+
+#SNAKE VARIABLES
+CURPOSX=-1
+CURPOSY=-1
+DELETE_X=-1
+DELETE_Y=-1
+POSITIONS_X=()
+POSITIONS_Y=()
+LENGTH=3
+GROW_FACTOR=3
+SNAKECHAR="#"
+
+#APPLE VARIABLES
+APPLE_X=-1
+APPLE_Y=-1
+APPLE_CHAR="o"
+#BLANK DIRECTION
+DIRECTION=-1
+
+function applePosition () {
+	APPLE_X=$(( $RANDOM % $(($WIDTH - 1)) + 1 ))
+	APPLE_Y=$(( $RANDOM % $(($HEIGHT - 1)) + 1 ))
+}
+
+function drawApple () {
+	local LASTEL=$(( ${#POSITIONS_X[@]} - 1 ))
+	x=0
+	applePosition
+	while [ "$x" -le "$LASTEL" ];
+	do
+		if [ "$APPLE_X" = "${POSITIONS_X[$x]}" ] && [ "$APPLE_Y" = "${POSITIONS_Y[$x]}" ];
+		then
+			x=0
+			applePosition
+		else
+			x=$(( $x + 1 ))
+		fi
+	done
+
+	tput cup $APPLE_Y $APPLE_X
+	printf "%s" $APPLE_CHAR 
+	
+}
+
+function moveSnake () {
+	
+	
+	case $DIRECTION in
+	w)
+		CURPOSY=$(($CURPOSY-1))
+	;;
+	s)
+		CURPOSY=$(($CURPOSY+1))
+	;;
+	a)
+		CURPOSX=$(($CURPOSX-1))
+	;;
+	d)
+		CURPOSX=$(($CURPOSX+1))
+	;;
+	esac
+
+	DELETE_X="${POSITIONS_X[$(($LENGTH-1))]}"
+	DELETE_Y="${POSITIONS_Y[$(($LENGTH-1))]}"
+
+	for ((i=$(($LENGTH-1)); i>0; i--))
+	do
+		POSITIONS_X[$i]=${POSITIONS_X[$(($i-1))]}
+		POSITIONS_Y[$i]=${POSITIONS_Y[$(($i-1))]}
+		if [ "$CURPOSX" = "${POSITIONS_X[$i]}" ] && [ "$CURPOSY" = "${POSITIONS_Y[$i]}" ];
+		then
+			tput cup $(($HEIGHT+1)) 0
+			echo "You ate yourself";
+			gameover
+		fi
+	done
+
+	POSITIONS_X[0]=$CURPOSX
+	POSITIONS_Y[0]=$CURPOSY
+
+	if [ "$CURPOSX" = "$APPLE_X" ] && [ "$CURPOSY" = "$APPLE_Y" ];
+	then
+		drawApple
+		growSnake
+	fi
+
+	if [ "$CURPOSX" -ge "$WIDTH" ] || [ "$CURPOSX" -le "0" ] || [ "$CURPOSY" -ge "$HEIGHT" ] || [ "$CURPOSY" -le "0" ];
+	then
+		tput cup $(( $HEIGHT+1)) 0
+		echo "You hit a wall!"
+		gameover
+	fi
+}
+
+function growSnake () {
+	
+	for ((i=0; i<$GROW_FACTOR; i++))
+	do
+		POSITIONS_X+=(${POSITIONS_X[-1]})
+		POSITIONS_Y+=(${POSITIONS_Y[-1]})
+		LENGTH=$(( $LENGTH + 1 ))
+	done
+}
+
+function drawSnake () {
+
+	if [[ "$DELETE_Y" -ne "-1" ]] && [[ "$DELETE_X" -ne "-1" ]]; then
+		tput cup $DELETE_Y $DELETE_X
+	fi
+	printf " "
+	
+	for ((i=$(($LENGTH-1)); i>-1; i-- ));
+	do
+		tput cup ${POSITIONS_Y[$i]} ${POSITIONS_X[$i]}
+		printf "%s" $SNAKECHAR
+	done
+}
+
+function initSnake () {
+	DIRECTION_INDEX=$(( RANDOM % 4 ))
+	DIRECTION=${DIRECTIONS[DIRECTION_INDEX]}
+	CURPOSX=$(($WIDTH/2))
+	CURPOSY=$(($HEIGHT/2))
+	#echo $DIRECTION
+	case $DIRECTION in
+	w)
+		for ((i=$(($LENGTH-1)); i>-1; i-- ));
+		do
+			POSITIONS_X[$i]="$CURPOSX"
+			POSITIONS_Y[$i]="$(($CURPOSY+$i))"
+		done
+	;;
+	s)
+		for ((i=$(($LENGTH-1)); i>-1; i-- ));
+		do
+			POSITIONS_X[$i]="$CURPOSX"
+			POSITIONS_Y[$i]="$(($CURPOSY-$i))"
+		done
+	;;
+	a)
+		for ((i=$(($LENGTH-1)); i>-1; i-- ));
+		do
+			POSITIONS_X[$i]="$(($CURPOSX+$i))"
+			POSITIONS_Y[$i]="$CURPOSY"
+		done
+	;;
+	d)
+		for ((i=$(($LENGTH-1)); i>-1; i-- ));
+		do
+			POSITION_X[$i]="$(($CURPOSX-$i))"
+			POSITION_Y[$i]="$CURPOSY"
+		done
+	;;
+	esac		
+}
+
+
+function drawBorders () {
+
+	tput cup 0 0;
+	local W=$(($WIDTH))
+	local H=$(($HEIGHT))
+	############
+	# DRAW TOP #
+	############
+	for i in `seq 0 $W`
+	do
+		tput cup 0 $i
+		echo "@"		
+	done
+	
+	#############
+	# DRAW LEFT #
+	#############
+	for i in `seq 1 $H`
+	do
+		tput cup $i 0
+		echo "@"
+	done
+
+	##############
+	# DRAW RIGHT #
+	##############
+	for i in `seq 1 $H`
+	do
+		tput cup $i $W
+		echo "@"
+	done
+
+	###############
+	# DRAW BOTTOM #
+	###############
+	for i in `seq 0 $W`
+	do
+		tput cup $H $i
+		echo "@"
+	done
+}
+
+function move () {
+	moveSnake
+	drawSnake
+	tput cup 40 40 
+	(sleep 0.1 && kill -ALRM $$) &
+}
+
+function initGame () {
+	clear
+	drawBorders 
+	initSnake	
+	drawSnake
+	drawApple
+	#echo "${POSITIONS_X[0]}"
+	#echo "${POSITIONS_Y[0]}"
+}
+
+gameover() {
+   tput cvvis
+   stty echo
+   sleep 0.1
+   trap exit ALRM
+   tput cup $ROWS 0
+   exit
+}
+
+initGame
+# function test () {
+#	echo "$DIRECTION";
+# 	(sleep 0.1 && kill -ALRM $$) &
+# }
+
+ trap move ALRM
+ sleep 1
+ move
+
+ while :
+ do
+	read -s -n 1 key
+	case $key in
+	w|s|a|d)
+		case $DIRECTION in
+		w)
+			if [ "$key" != "s" ];
+			then
+				DIRECTION="$key"
+			fi
+		;;
+		s)
+			if [ "$key" != "w" ];
+			then
+				DIRECTION="$key"
+			fi
+		;;
+		a)
+			if [ "$key" != "d" ];
+			then
+				DIRECTION="$key"
+			fi
+		;;
+		d)
+			if [ "$key" != "a" ];
+			then
+				DIRECTION="$key"
+			fi
+		;;
+		esac
+		sleep 0.1
+	;;
+	esac
+ done
